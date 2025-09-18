@@ -11,7 +11,7 @@ function Chatbot({ onClose }) {
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
 
-  const API_KEY = "AIzaSyDoNd2sj1ohsSgtwstuD-yho5sBrQ3Supk";
+  const API_KEY = "AIzaSyCOc9l_AEMdQGqTnjFp9Gclh77CZYRHN9Q";
   const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
 
   useEffect(() => {
