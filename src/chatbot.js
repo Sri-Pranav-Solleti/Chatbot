@@ -9,8 +9,9 @@ function Chatbot({ onClose }) {
   const [isRecording, setIsRecording] = useState(false);
   const [voices, setVoices] = useState([]);
   const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
 
-  const API_KEY = "AIzaSyDoNd2sj1ohsSgtwstuD-yho5sBrQ3Supk";
+  const API_KEY = "YOUR_API_KEY";
   const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
 
   useEffect(() => {
@@ -19,14 +20,23 @@ function Chatbot({ onClose }) {
     window.speechSynthesis.onvoiceschanged = loadVoices;
   }, []);
 
+  // handle resize for mobile keyboard
   useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 700);
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 700);
+      if (messagesContainerRef.current) {
+        const headerHeight = isMobile ? 70 : 0; // approx header + padding
+        const inputHeight = 70; // approx input height
+        messagesContainerRef.current.style.height = `${window.innerHeight - headerHeight - inputHeight}px`;
+        scrollToBottom();
+      }
+    };
     window.addEventListener("resize", handleResize);
+    handleResize();
     return () => window.removeEventListener("resize", handleResize);
-  }, []);
+  }, [isMobile]);
 
   const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  useEffect(() => scrollToBottom(), [messages]);
 
   const stripMarkdown = (text) => text.replace(/[*_~`#>]/g, "").replace(/\*\*(.*?)\*\*/g, "$1").replace(/\*(.*?)\*/g, "$1").replace(/_(.*?)_/g, "$1").replace(/`/g, "").replace(/\n\s*\n/g, "\n");
 
@@ -42,12 +52,10 @@ function Chatbot({ onClose }) {
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = detectLanguage(text);
     utterance.rate = 0.9;
-
     let voice = voices.find((v) => v.lang === utterance.lang);
     if (!voice) voice = voices.find((v) => v.lang.startsWith(utterance.lang.split("-")[0]));
     if (!voice) voice = voices.find((v) => v.lang.startsWith("en"));
     if (voice) utterance.voice = voice;
-
     window.speechSynthesis.speak(utterance);
   };
 
@@ -72,6 +80,7 @@ function Chatbot({ onClose }) {
       setMessages((prev) => [...prev, { role: "model", text: "Server error." }]);
     }
     setIsLoading(false);
+    scrollToBottom();
   };
 
   const handleKeyDown = (e) => { if (e.key === "Enter") sendMessage(); };
@@ -82,7 +91,6 @@ function Chatbot({ onClose }) {
     recognition.lang = "en-US";
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
-
     recognition.onstart = () => setIsRecording(true);
     recognition.onend = () => setIsRecording(false);
     recognition.onresult = (event) => { setInput(event.results[0][0].transcript); sendMessage(); };
@@ -98,7 +106,7 @@ function Chatbot({ onClose }) {
         </div>
       )}
 
-      <div className="chatbot-messages">
+      <div className="chatbot-messages" ref={messagesContainerRef}>
         {messages.map((msg, i) => (
           <div key={i} className={`chatbot-message ${msg.role === "user" ? "user" : "ai"}`}>
             <div className="chat-message-content">{msg.text}</div>
