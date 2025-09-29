@@ -11,8 +11,11 @@ function Chatbot({ onClose }) {
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
 
-  const API_KEY = "AIzaSyCOc9l_AEMdQGqTnjFp9Gclh77CZYRHN9Q";
-  const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
+  const API_KEY = "AIzaSyCOc9l_AEMdQGqTnjFp9Gclh77CZYRHN9Q"; // replace with your Gemini API key
+  const API_URL =
+  "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=" +
+  API_KEY;
+
 
   useEffect(() => {
     const loadVoices = () => setVoices(window.speechSynthesis.getVoices());
@@ -20,14 +23,15 @@ function Chatbot({ onClose }) {
     window.speechSynthesis.onvoiceschanged = loadVoices;
   }, []);
 
-  // handle resize for mobile keyboard
   useEffect(() => {
     const handleResize = () => {
       setIsMobile(window.innerWidth < 700);
       if (messagesContainerRef.current) {
-        const headerHeight = isMobile ? 70 : 0; // approx header + padding
-        const inputHeight = 70; // approx input height
-        messagesContainerRef.current.style.height = `${window.innerHeight - headerHeight - inputHeight}px`;
+        const headerHeight = isMobile ? 70 : 0;
+        const inputHeight = 70;
+        messagesContainerRef.current.style.height = `${
+          window.innerHeight - headerHeight - inputHeight
+        }px`;
         scrollToBottom();
       }
     };
@@ -36,9 +40,17 @@ function Chatbot({ onClose }) {
     return () => window.removeEventListener("resize", handleResize);
   }, [isMobile]);
 
-  const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  const scrollToBottom = () =>
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
 
-  const stripMarkdown = (text) => text.replace(/[*_~`#>]/g, "").replace(/\*\*(.*?)\*\*/g, "$1").replace(/\*(.*?)\*/g, "$1").replace(/_(.*?)_/g, "$1").replace(/`/g, "").replace(/\n\s*\n/g, "\n");
+  const stripMarkdown = (text) =>
+    text
+      .replace(/[*_~`#>]/g, "")
+      .replace(/\*\*(.*?)\*\*/g, "$1")
+      .replace(/\*(.*?)\*/g, "$1")
+      .replace(/_(.*?)_/g, "$1")
+      .replace(/`/g, "")
+      .replace(/\n\s*\n/g, "\n");
 
   const detectLanguage = (text) => {
     if (/[\u0B80-\u0BFF]/.test(text)) return "ta-IN";
@@ -53,7 +65,10 @@ function Chatbot({ onClose }) {
     utterance.lang = detectLanguage(text);
     utterance.rate = 0.9;
     let voice = voices.find((v) => v.lang === utterance.lang);
-    if (!voice) voice = voices.find((v) => v.lang.startsWith(utterance.lang.split("-")[0]));
+    if (!voice)
+      voice = voices.find((v) =>
+        v.lang.startsWith(utterance.lang.split("-")[0])
+      );
     if (!voice) voice = voices.find((v) => v.lang.startsWith("en"));
     if (voice) utterance.voice = voice;
     window.speechSynthesis.speak(utterance);
@@ -61,6 +76,7 @@ function Chatbot({ onClose }) {
 
   const sendMessage = async () => {
     if (!input.trim()) return;
+
     setMessages([...messages, { role: "user", text: input }]);
     setInput("");
     setIsLoading(true);
@@ -69,31 +85,59 @@ function Chatbot({ onClose }) {
       const res = await fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contents: [{ parts: [{ text: input }] }] }),
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [{ text: input }]
+            }
+          ]
+        })
       });
+
       const data = await res.json();
-      const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text || "Server error.";
+      console.log("Gemini raw response:", data);
+
+      if (data.error) {
+        throw new Error(data.error.message || "Unknown server error");
+      }
+
+      const reply =
+        data?.candidates?.[0]?.content?.parts?.[0]?.text || "No reply.";
+
       const cleanedText = stripMarkdown(reply);
       setMessages((prev) => [...prev, { role: "model", text: cleanedText }]);
       speakText(cleanedText);
-    } catch {
-      setMessages((prev) => [...prev, { role: "model", text: "Server error." }]);
+    } catch (err) {
+      console.error("Error talking to Gemini:", err);
+      setMessages((prev) => [
+        ...prev,
+        { role: "model", text: "Error: " + err.message }
+      ]);
     }
+
     setIsLoading(false);
     scrollToBottom();
   };
 
-  const handleKeyDown = (e) => { if (e.key === "Enter") sendMessage(); };
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter") sendMessage();
+  };
 
   const startListening = () => {
-    if (!("webkitSpeechRecognition" in window)) { alert("Speech recognition not supported"); return; }
+    if (!("webkitSpeechRecognition" in window)) {
+      alert("Speech recognition not supported");
+      return;
+    }
     const recognition = new window.webkitSpeechRecognition();
     recognition.lang = "en-US";
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
     recognition.onstart = () => setIsRecording(true);
     recognition.onend = () => setIsRecording(false);
-    recognition.onresult = (event) => { setInput(event.results[0][0].transcript); sendMessage(); };
+    recognition.onresult = (event) => {
+      setInput(event.results[0][0].transcript);
+      sendMessage();
+    };
     recognition.start();
   };
 
@@ -102,13 +146,20 @@ function Chatbot({ onClose }) {
       {isMobile && (
         <div className="chatbot-header-bar">
           <span className="chatbot-back">Heritage AI</span>
-          <span className="chatbot-close-btn" onClick={onClose}>×</span>
+          <span className="chatbot-close-btn" onClick={onClose}>
+            ×
+          </span>
         </div>
       )}
 
       <div className="chatbot-messages" ref={messagesContainerRef}>
         {messages.map((msg, i) => (
-          <div key={i} className={`chatbot-message ${msg.role === "user" ? "user" : "ai"}`}>
+          <div
+            key={i}
+            className={`chatbot-message ${
+              msg.role === "user" ? "user" : "ai"
+            }`}
+          >
             <div className="chat-message-content">{msg.text}</div>
           </div>
         ))}
@@ -121,9 +172,17 @@ function Chatbot({ onClose }) {
       </div>
 
       <div className="chatbot-input-container">
-        <input type="text" placeholder="Type your message..." value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKeyDown} />
+        <input
+          type="text"
+          placeholder="Type your message..."
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+        />
         <button onClick={sendMessage}>➤</button>
-        <button onClick={startListening}>{isRecording ? "🎙️..." : "🎤"}</button>
+        <button onClick={startListening}>
+          {isRecording ? "🎙️..." : "🎤"}
+        </button>
       </div>
     </div>
   );
